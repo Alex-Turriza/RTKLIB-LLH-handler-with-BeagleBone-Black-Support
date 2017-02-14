@@ -17,6 +17,7 @@
 #include <cstdlib> //Usado por función system()
 //#include <cstdio> //Usado por perror, ya inicializado en gps.h
 #include <thread> //Usado para manejar diferentes hilos
+#include <fstream> //Usado para el archivo logGPS.txt
 #include "gps.h" //Usado por objeto GPS
 #include "lcd.h" //Usado para manejo de objeto de tipo LCD
 
@@ -34,7 +35,7 @@
 #endif
 
 #ifndef _DELAYTIME_
-#define _DELAYTIME_ 0.7 //Segundos, destinado a funcionar con los hertz de un gps.
+#define _DELAYTIME_ 0.7 //Segundos, destinado a funcionar en función de los hertz del gps.
 #endif
 
 /*Declaración de punteros globales*/
@@ -85,7 +86,7 @@ void actualiza(GPS * ugps, int fd)
 	}
 }
 
-void imprimeGPS(GPS * ugps, lcd * myLcd) 
+void imprimeGPS(GPS * ugps, lcd * myLcd, std::ofstream * output) 
 {
 	/*Función que imprime los datos del objeto GPS a la LCD.*/
 	std::string temp = "";
@@ -96,15 +97,17 @@ void imprimeGPS(GPS * ugps, lcd * myLcd)
 		{
 			myLcd->setColor(3); //GPS azul indica señal fix.
 			ugps->lockMutex();
-			temp += "Lat:"; 
 			temp += ugps->getLatitud().substr(0,7);
-			temp += "   Lon: ";
+			temp += ", ";
 			temp += ugps->getLongitud().substr(0,7);
-			temp += " Alt: "; 
+			temp += "A:"; 
 			temp += ugps->getAltitud().substr(0,4);
-			temp += "Sat: ";
+			temp += ", Sat: ";
 			temp += ugps->getNumSat();
 			myLcd->writeMessage(temp);
+			#ifdef _SALIDA_
+			* output << ugps->getLatitud() << ", " << ugps->getLongitud() << std::endl;
+			#endif
 			ugps->unlockMutex();
 			temp.clear();
 			usleep(_DELAYTIME_ * 1000000);
@@ -167,6 +170,7 @@ void pbPooling(BlackLib::BlackGPIO * bt1, BlackLib::BlackGPIO * bt2, BlackLib::B
 				usleep(300000); //¿Puede ser retirado este usleep?
 				std::thread(apagar).detach();
 				raise(SIGUSR1);
+				break;
 			}
 		}
 		led->setValue(high);
@@ -202,6 +206,7 @@ int main()
 	{
 		/*Inicialización de objetos que NO pueden duplicarse por el fork()*/
 		lcd myLcd; //Objeto LCD. contiene métodos para manejar una lcd conectada a pines de la BeagleBone.
+		std::ofstream * ptr = NULL;
 		BlackLib::BlackGPIO led(BlackLib::GPIO_61, BlackLib::output, BlackLib::SecureMode);
 		BlackLib::BlackGPIO button1(BlackLib::GPIO_3, BlackLib::input);
 		BlackLib::BlackGPIO button2(BlackLib::GPIO_49, BlackLib::input);
@@ -211,19 +216,20 @@ int main()
 		ledForSignalHand = &led; //Puntero global del led para funciones de manejo de señales. 
 		lcdForSignalHand = &myLcd; //Puntero globla de lcd para funciones de manejo de señales.
 		fdForSignalHand = &fd;
-
+		#ifdef _SALIDA_
+		std::ofstream output("logGPS.txt");
+		ptr = &output;
+		#endif
 		sleep(2); //Damos tiempo a que RTKLIB inicie correctamente.
 		if((fd = openSocket()) >= 0)
 		{
 			if(!(conecta(_DIRECHOST_, _PUERTORTKLIB_, fd)))
 			{
 				//Conexión exitosa.
-				cout << "Conexión exitosa..." << endl;
 				led.setValue(high); //Encendemos led indicando conexión exitosa.
-				cout << "Los botones entran con valores: " << button1.getValue() << "-" << button2.getValue() << endl; 
 				//RUTINA DE MANEJO DE GPS
 				std::thread(actualiza, &ubloxC94, fd).detach();
-				std::thread(imprimeGPS, &ubloxC94, &myLcd).detach();
+				std::thread(imprimeGPS, &ubloxC94, &myLcd, ptr).detach();
 				//RUTINA DE MANEJO DE BOTONES
 				std::thread(pbPooling, &button1, &button2, &led).join();
 			}
@@ -233,6 +239,9 @@ int main()
 			perror("close() socket ERROR");
 			return (-1);
 		}
+		#ifdef _SALIDA_
+		output.close();
+		#endif
 	}
 	return 0;
 }
