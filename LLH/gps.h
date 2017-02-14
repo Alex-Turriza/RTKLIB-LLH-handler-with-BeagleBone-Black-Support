@@ -12,7 +12,9 @@
 #include <cstdio> //Usado por perror
 #include <mutex> //Usado por objeto de tipo Mutex
 
-#define _FIXVALUE_ 2.5 //Valor parámetro para indicar si señal del GPS es fiable o no.
+#ifndef _FIXVALUE_
+#define _FIXVALUE_ 1.5 //Valor parámetro para indicar si señal del GPS es fiable o no.
+#endif
 
 int leeSckt(int fdSocket, void * buf, size_t bytes);
 
