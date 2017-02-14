@@ -1,9 +1,13 @@
-all:GPSHandler
+all:GPSHandler Logger
 
 CXXFLAGS=-g -I ./LLH -I ./include -I ./GPIOControl -std=c++11 -lpthread
 
 GPSHandler: objs/sdev.o objs/llh.o objs/gps.o objs/BlackCore.o objs/BlackGPIO.o objs/lcd.o objs/GPSHandler.o
 	$(CXX) $(CXXFLAGS) objs/GPSHandler.o objs/gps.o objs/llh.o objs/sdev.o objs/BlackCore.o objs/BlackGPIO.o -o GPSHandler
+	chmod 777 -R *
+
+Logger: objs/sdev.o objs/llh.o objs/gps.o objs/BlackCore.o objs/BlackGPIO.o objs/lcd.o objs/GPSHandler.o
+	$(CXX) $(CXXFLAGS) -D _SALIDA_ objs/GPSHandler.o objs/gps.o objs/llh.o objs/sdev.o objs/BlackCore.o objs/BlackGPIO.o -o Logger
 	chmod 777 -R *
 
 objs/sdev.o: 
@@ -30,4 +34,4 @@ objs/GPSHandler.o:
 
 
 clean:
-	-rm objs/*.o GPSHandler
+	-rm objs/*.o GPSHandler Logger
